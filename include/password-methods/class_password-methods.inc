@@ -70,30 +70,34 @@ class passwordMethod
 
 
     /*! \brief       Locks an account (gosaAccount) by added a '!' as prefix to the password hashes.
+     *               Adds a D to sambaAcctFlags to mark it disabled there as well
      *               This makes logins impossible, due to the fact that the hash becomes invalid.
      *                 userPassword: {SHA}!q02NKl9IChNwZEAJxzRdmB6E
      *                 sambaLMPassword: !EBD223B61F8C259AD3B435B51404EE
      *                 sambaNTPassword: !98BB35737013AAF181D0FE9FDA09E
+     *                 sambaAcctFlags: [UD    ]
      */               
     function lock_account($config,$dn = "")
     {
         if(!$this->lockable) return FALSE;
 
         /* Get current password hash */
-        $userPassword = $sambaLMPassword = $sambaNTPassword = "";
+        $userPassword = $sambaLMPassword = $sambaNTPassword = $sambaAcctFlags = "";
         $ldap = $config->get_ldap_link();
         $ldap->cd($config->current['BASE']);
         if(!empty($dn)){
-            $ldap->cat($dn,array('sambaLMPassword','sambaNTPassword','userPassword'));
+            $ldap->cat($dn,array('sambaLMPassword','sambaNTPassword','userPassword','sambeAcctFlags'));
             $attrs = $ldap->fetch();
             $userPassword = (isset($attrs['userPassword'][0])) ? $attrs['userPassword'][0]: "";
             $sambaLMPassword = (isset($attrs['sambaLMPassword'][0])) ? $attrs['sambaLMPassword'][0]: "";
             $sambaNTPassword = (isset($attrs['sambaNTPassword'][0])) ? $attrs['sambaNTPassword'][0]: "";
+            $sambaAcctFlags = (isset($attrs['sambaAcctFlags'][0])) ? $attrs['sambaAcctFlags'][0]: "";
         }elseif(isset($this->attrs['userPassword'][0])){
             $dn = $this->attrs['dn'];
             $userPassword = (isset($this->attrs['userPassword'][0])) ? $this->attrs['userPassword'][0]: "";
             $sambaLMPassword = (isset($this->attrs['sambaLMPassword'][0])) ? $this->attrs['sambaLMPassword'][0]: "";
             $sambaNTPassword = (isset($this->attrs['sambaNTPassword'][0])) ? $this->attrs['sambaNTPassword'][0]: "";
+            $sambaAcctFlags = (isset($this->attrs['sambaAcctFlags'][0])) ? $this->attrs['sambaAcctFlags'][0]: "";
         }
 
         /* We can only lock/unlock non-empty passwords */
@@ -112,6 +116,7 @@ class passwordMethod
             if($smbPasswdEnabled){
                 $sambaLMPassword = preg_replace("/^[!]*(.*$)/","!\\1",$sambaLMPassword);
                 $sambaNTPassword = preg_replace("/^[!]*(.*$)/","!\\1",$sambaNTPassword);
+                $sambaAcctFlags = preg_replace("/UD*(.*])/", "UD\\1",$sambaAcctFlags);
             }
 
             // Call external lock hook
@@ -130,10 +135,11 @@ class passwordMethod
             $attrs = array();
             $attrs['userPassword'] = $userPassword;
     
-            // Updated samba hashes if samba hashing is enabled
+            // Updated samba hashes and flags if samba hashing is enabled
             if($smbPasswdEnabled){
                 $attrs['sambaLMPassword'] = $sambaLMPassword;
                 $attrs['sambaNTPassword'] = $sambaNTPassword;
+                $attrs['sambaAcctFlags'] = $sambaAcctFlags;
             }
 
             $ldap->modify($attrs);
@@ -157,20 +163,22 @@ class passwordMethod
         if(!$this->lockable) return FALSE;
 
         /* Get current password hash */
-        $userPassword = $sambaLMPassword = $sambaNTPassword = "";
+        $userPassword = $sambaLMPassword = $sambaNTPassword = $sambaAcctFlags = "";
         $ldap = $config->get_ldap_link();
         $ldap->cd($config->current['BASE']);
         if(!empty($dn)){
-            $ldap->cat($dn,array('sambaLMPassword','sambaNTPassword','userPassword'));
+            $ldap->cat($dn,array('sambaLMPassword','sambaNTPassword','sambaAcctFlags','userPassword'));
             $attrs = $ldap->fetch();
             $userPassword = (isset($attrs['userPassword'][0])) ? $attrs['userPassword'][0]: "";
             $sambaLMPassword = (isset($attrs['sambaLMPassword'][0])) ? $attrs['sambaLMPassword'][0]: "";
             $sambaNTPassword = (isset($attrs['sambaNTPassword'][0])) ? $attrs['sambaNTPassword'][0]: "";
+            $sambaAcctFlags = (isset($attrs['sambaAcctFlags'][0])) ? $attrs['sambaAcctFlags'][0]: "";
         }elseif(isset($this->attrs['userPassword'][0])){
             $dn = $this->attrs['dn'];
             $userPassword = (isset($this->attrs['userPassword'][0])) ? $this->attrs['userPassword'][0]: "";
             $sambaLMPassword = (isset($this->attrs['sambaLMPassword'][0])) ? $this->attrs['sambaLMPassword'][0]: "";
             $sambaNTPassword = (isset($this->attrs['sambaNTPassword'][0])) ? $this->attrs['sambaNTPassword'][0]: "";
+            $sambaAcctFlags = (isset($this->attrs['sambaAcctFlags'][0])) ? $this->attrs['sambaAcctFlags'][0]: "";
         }
 
 
@@ -191,6 +199,7 @@ class passwordMethod
             if($smbPasswdEnabled){
                 $sambaLMPassword = preg_replace("/^[!]*(.*$)/","\\1",$sambaLMPassword);
                 $sambaNTPassword = preg_replace("/^[!]*(.*$)/","\\1",$sambaNTPassword);
+                $sambaAcctFlags = preg_replace("/D*/"," ",$sambaAcctFlags, 1);
             }
 
             // Call external lock hook
@@ -215,6 +224,7 @@ class passwordMethod
             if($smbPasswdEnabled){
                 $attrs['sambaLMPassword'] = $sambaLMPassword;
                 $attrs['sambaNTPassword'] = $sambaNTPassword;
+                $attrs['sambaAcctFlags'] = $sambaAcctFlags;
             }
 
             $ldap->modify($attrs);
